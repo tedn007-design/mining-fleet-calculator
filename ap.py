@@ -101,14 +101,3 @@ elif daily_dig_capacity < daily_target:
     st.error("❌ Fleet cannot meet daily target. Dig rate is the bottleneck.")
 else:
     st.success("✅ Fleet can meet daily target.")
-
-# -----------------------------
-# SUMMARY
-# -----------------------------
-st.header("Summary")
-st.write("""
-- Corrected terminology: Utilisation = Use of Availability  
-- Effective Utilisation (Avail × Util) now drives all production calculations  
-- Alerts highlight cycle time, dig rate, availability, utilisation, and effective utilisation  
-- Use this tool during pre‑start, mid‑shift checks, and production troubleshooting  
-""")
