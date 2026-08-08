@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Mining Fleet Capacity Calculator", page_icon="L2.png")
+st.set_page_config(page_title="Mine Fleet Capacity Calculator", page_icon="L2.png")
 
 st.title("⛏️ Mining Fleet Capacity Calculator")
 st.write("Quick diagnostic tool for engineers, supervisors, and shift foremen.")
