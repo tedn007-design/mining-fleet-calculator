@@ -1,26 +1,65 @@
 import streamlit as st
 
-st.set_page_config(page_title="Mine Fleet Capacity Calculator", page_icon="L2.png")
+st.set_page_config(page_title="Mine Fleet Calculator", page_icon="L2.png")
 
 st.title("⛏️ Mining Fleet Capacity Calculator")
 st.write("Quick diagnostic tool for engineers, supervisors, and shift foremen.")
 
-# -----------------------------
+# ---------------------------------------------------------
+# INITIALISE SESSION STATE LISTS
+# ---------------------------------------------------------
+if "excavators" not in st.session_state:
+    st.session_state.excavators = [{"rate": 950}]
+if "trucks" not in st.session_state:
+    st.session_state.trucks = [{"capacity": 105, "count": 15}]
+
+# ---------------------------------------------------------
 # INPUT PARAMETERS
-# -----------------------------
+# ---------------------------------------------------------
 st.header("Input Parameters")
 
 daily_target = st.number_input("Daily Target (BCM)", value=40000)
 
-st.subheader("Excavator Dig Rates (BCM/hr)")
-ex1 = st.number_input("Excavator 1 Dig Rate", value=950)
-ex2 = st.number_input("Excavator 2 Dig Rate", value=900)
-ex3 = st.number_input("Excavator 3 Dig Rate", value=450)
+# ---------------------------------------------------------
+# DYNAMIC EXCAVATORS
+# ---------------------------------------------------------
+st.subheader("Excavators (Add as many as needed)")
 
-st.subheader("Truck Fleet")
-num_trucks = st.number_input("Number of Trucks", value=15)
-truck_capacity = st.number_input("Truck Capacity (BCM)", value=105)
+# Add new excavator
+if st.button("➕ Add Excavator"):
+    st.session_state.excavators.append({"rate": 0})
 
+# Display excavators
+for i, ex in enumerate(st.session_state.excavators):
+    st.session_state.excavators[i]["rate"] = st.number_input(
+        f"Excavator {i+1} Dig Rate (BCM/hr)",
+        value=ex["rate"],
+        key=f"ex_{i}"
+    )
+
+# ---------------------------------------------------------
+# DYNAMIC TRUCK TYPES
+# ---------------------------------------------------------
+st.subheader("Truck Fleet (Add multiple truck types)")
+
+if st.button("➕ Add Truck Type"):
+    st.session_state.trucks.append({"capacity": 0, "count": 0})
+
+for i, tr in enumerate(st.session_state.trucks):
+    st.session_state.trucks[i]["capacity"] = st.number_input(
+        f"Truck Type {i+1} Capacity (BCM)",
+        value=tr["capacity"],
+        key=f"tr_cap_{i}"
+    )
+    st.session_state.trucks[i]["count"] = st.number_input(
+        f"Truck Type {i+1} Count",
+        value=tr["count"],
+        key=f"tr_count_{i}"
+    )
+
+# ---------------------------------------------------------
+# CYCLE TIME & UTILISATION
+# ---------------------------------------------------------
 st.subheader("Cycle Time")
 cycle_time_min = st.number_input("Actual Cycle Time (minutes)", value=42)
 
@@ -28,21 +67,23 @@ st.subheader("Availability & Utilisation")
 availability = st.number_input("Mechanical Availability (%)", value=90)
 utilisation = st.number_input("Use of Availability (Utilisation %)", value=85)
 
-# Effective Utilisation = Availability × Utilisation
 effective_utilisation = (availability / 100) * (utilisation / 100)
 
-# -----------------------------
+# ---------------------------------------------------------
 # CALCULATIONS
-# -----------------------------
-total_dig_rate = ex1 + ex2 + ex3
+# ---------------------------------------------------------
+total_dig_rate = sum(ex["rate"] for ex in st.session_state.excavators)
 daily_dig_capacity = total_dig_rate * 24 * effective_utilisation
 
-truck_hourly_capacity = (60 / cycle_time_min) * truck_capacity * num_trucks * effective_utilisation
+truck_hourly_capacity = sum(
+    (60 / cycle_time_min) * tr["capacity"] * tr["count"] * effective_utilisation
+    for tr in st.session_state.trucks
+)
 daily_truck_capacity = truck_hourly_capacity * 24
 
-# -----------------------------
-# ALERTS SECTION
-# -----------------------------
+# ---------------------------------------------------------
+# ALERTS
+# ---------------------------------------------------------
 st.header("Operational Alerts")
 
 # Cycle time alerts
@@ -54,40 +95,40 @@ else:
     st.success("✅ Cycle time within optimal range.")
 
 # Dig rate alerts
-if ex1 < 800 or ex2 < 800 or ex3 < 400:
+if any(ex["rate"] < 400 for ex in st.session_state.excavators):
     st.error("❌ One or more excavators are digging below expected performance.")
-elif ex1 < 900 or ex2 < 900 or ex3 < 450:
+elif any(ex["rate"] < 900 for ex in st.session_state.excavators):
     st.warning("⚠️ Excavator dig rates slightly below target. Monitor performance.")
 else:
     st.success("✅ Excavator dig rates are healthy.")
 
 # Availability alerts
 if availability < 80:
-    st.error("❌ Mechanical Availability critically low. Major breakdown or maintenance delays.")
+    st.error("❌ Mechanical Availability critically low.")
 elif availability < 90:
-    st.warning("⚠️ Availability slightly below target. Review maintenance planning.")
+    st.warning("⚠️ Availability slightly below target.")
 else:
     st.success("✅ Availability within expected range.")
 
-# Utilisation alerts (Use of Availability)
+# Utilisation alerts
 if utilisation < 70:
-    st.error("❌ Utilisation critically low. Excessive idle time or operational delays.")
+    st.error("❌ Utilisation critically low.")
 elif utilisation < 85:
-    st.warning("⚠️ Utilisation slightly below target. Check dispatch efficiency.")
+    st.warning("⚠️ Utilisation slightly below target.")
 else:
     st.success("✅ Utilisation healthy.")
 
-# Effective Utilisation alerts
+# Effective utilisation alerts
 if effective_utilisation < 0.60:
-    st.error("❌ Effective Utilisation (Avail × Util) critically low. Fleet output severely impacted.")
+    st.error("❌ Effective Utilisation critically low.")
 elif effective_utilisation < 0.75:
-    st.warning("⚠️ Effective Utilisation below optimal. Review shift performance.")
+    st.warning("⚠️ Effective Utilisation below optimal.")
 else:
     st.success("✅ Effective Utilisation strong.")
 
-# -----------------------------
+# ---------------------------------------------------------
 # PRODUCTION VERDICT
-# -----------------------------
+# ---------------------------------------------------------
 st.header("Production Verdict")
 
 st.write(f"**Total Dig Rate:** {total_dig_rate} BCM/hr")
