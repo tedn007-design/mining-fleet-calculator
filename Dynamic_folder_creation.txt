@@ -1,0 +1,29 @@
+@echo off
+setlocal enabledelayedexpansion
+
+:: === STATIC TEMPLATE FOLDER (never changes) ===
+set "TEMPLATE=C:\2 Engineering\3 Drill and Blast\2 Template"
+
+echo Enter new design folder name (e.g., S3_5310_002):
+set /p NEWFOLDER=
+
+:: Extract S-folder (S1, S2, S3)
+for /f "tokens=1 delims=_" %%a in ("%NEWFOLDER%") do set S_FOLDER=%%a
+
+:: Extract bench (e.g., 5310)
+for /f "tokens=2 delims=_" %%a in ("%NEWFOLDER%") do set BENCH=%%a
+
+:: Build destination path
+set "DEST=C:\2 Engineering\3 Drill and Blast\!S_FOLDER!\!BENCH!\%NEWFOLDER%"
+
+echo Creating folder: "!DEST!"
+mkdir "!DEST!"
+
+echo Copying template files...
+xcopy "%TEMPLATE%\*" "!DEST!\" /E /I /H /Y
+
+echo.
+echo Folder created successfully.
+echo Location: "!DEST!"
+echo.
+pause
