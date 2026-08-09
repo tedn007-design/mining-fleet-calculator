@@ -23,39 +23,55 @@ daily_target = st.number_input("Daily Target (BCM)", value=40000)
 # ---------------------------------------------------------
 # DYNAMIC EXCAVATORS
 # ---------------------------------------------------------
-st.subheader("Excavators (Add as many as needed)")
+st.subheader("Excavators (Add or Remove)")
 
 # Add new excavator
 if st.button("➕ Add Excavator"):
     st.session_state.excavators.append({"rate": 0})
 
-# Display excavators
+# Display excavators with remove buttons
 for i, ex in enumerate(st.session_state.excavators):
-    st.session_state.excavators[i]["rate"] = st.number_input(
+    cols = st.columns([3, 1])
+    st.session_state.excavators[i]["rate"] = cols[0].number_input(
         f"Excavator {i+1} Dig Rate (BCM/hr)",
         value=ex["rate"],
         key=f"ex_{i}"
     )
 
+    # Remove button
+    if cols[1].button(f"🗑️ Remove", key=f"remove_ex_{i}"):
+        st.session_state.excavators.pop(i)
+        st.experimental_rerun()
+
 # ---------------------------------------------------------
 # DYNAMIC TRUCK TYPES
 # ---------------------------------------------------------
-st.subheader("Truck Fleet (Add multiple truck types)")
+st.subheader("Truck Fleet (Add or Remove Truck Types)")
 
+# Add new truck type
 if st.button("➕ Add Truck Type"):
     st.session_state.trucks.append({"capacity": 0, "count": 0})
 
+# Display truck types with remove buttons
 for i, tr in enumerate(st.session_state.trucks):
-    st.session_state.trucks[i]["capacity"] = st.number_input(
+    cols = st.columns([3, 3, 1])
+
+    st.session_state.trucks[i]["capacity"] = cols[0].number_input(
         f"Truck Type {i+1} Capacity (BCM)",
         value=tr["capacity"],
         key=f"tr_cap_{i}"
     )
-    st.session_state.trucks[i]["count"] = st.number_input(
+
+    st.session_state.trucks[i]["count"] = cols[1].number_input(
         f"Truck Type {i+1} Count",
         value=tr["count"],
         key=f"tr_count_{i}"
     )
+
+    # Remove button
+    if cols[2].button(f"🗑️ Remove", key=f"remove_tr_{i}"):
+        st.session_state.trucks.pop(i)
+        st.experimental_rerun()
 
 # ---------------------------------------------------------
 # CYCLE TIME & UTILISATION
