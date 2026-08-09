@@ -38,10 +38,10 @@ for i, ex in enumerate(st.session_state.excavators):
         key=f"ex_{i}"
     )
 
-    # Remove button
-    if cols[1].button(f"🗑️ Remove", key=f"remove_ex_{i}"):
+    # Remove button (minus sign)
+    if cols[1].button("➖", key=f"remove_ex_{i}"):
         st.session_state.excavators.pop(i)
-        st.experimental_rerun()
+        st.rerun()
 
 # ---------------------------------------------------------
 # DYNAMIC TRUCK TYPES
@@ -68,10 +68,10 @@ for i, tr in enumerate(st.session_state.trucks):
         key=f"tr_count_{i}"
     )
 
-    # Remove button
-    if cols[2].button(f"🗑️ Remove", key=f"remove_tr_{i}"):
+    # Remove button (minus sign)
+    if cols[2].button("➖", key=f"remove_tr_{i}"):
         st.session_state.trucks.pop(i)
-        st.experimental_rerun()
+        st.rerun()
 
 # ---------------------------------------------------------
 # CYCLE TIME & UTILISATION
