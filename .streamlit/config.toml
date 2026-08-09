@@ -1,2 +1,3 @@
 [ui]
-favicon="L2.png"
+page_icon = "L2.png"
+manifest_icon = "L2.png"
