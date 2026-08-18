@@ -18,6 +18,41 @@ if "cycles" not in st.session_state:
     ]
 
 # ---------------------------------------------------------
+# GLOBAL INPUTS (EQUIPMENT AVAILABILITY & STAFFING)
+# ---------------------------------------------------------
+st.header("Global Inputs & Availability")
+
+daily_target = st.number_input("Daily Target (BCM)", value=40000)
+
+st.subheader("Excavator Fleet Metrics")
+col_ex1, col_ex2 = st.columns(2)
+ex_avail = col_ex1.number_input("Excavator Mechanical Availability (%)", value=90.0)
+ex_util = col_ex2.number_input("Excavator Use of Availability (Utilisation %)", value=85.0)
+
+st.subheader("Truck Fleet Metrics")
+col_tr1, col_tr2 = st.columns(2)
+tr_avail = col_tr1.number_input("Truck Mechanical Availability (%)", value=85.0)
+tr_util = col_tr2.number_input("Truck Use of Availability (Utilisation %)", value=80.0)
+
+st.subheader("Labor / Operator Constraints")
+col_op1, col_op2 = st.columns(2)
+
+# Count total configured units across all cycles for labor comparisons
+total_ex_units = sum(len(c["excavators"]) for c in st.session_state.cycles)
+total_tr_units = sum(sum(t["count"] for t in c["trucks"]) for c in st.session_state.cycles)
+
+ex_operators = col_op1.number_input("Available Excavator Operators", value=int(total_ex_units))
+tr_operators = col_op2.number_input("Available Truck Operators", value=int(total_tr_units))
+
+# Effective equipment utilizations incorporating mechanical availability & UA
+ex_effective_util = (ex_avail / 100.0) * (ex_util / 100.0)
+tr_effective_util = (tr_avail / 100.0) * (tr_util / 100.0)
+
+# Operator constraint scaling factor (caps fleet capacity if operators < physical units)
+ex_labor_factor = min(1.0, ex_operators / total_ex_units) if total_ex_units > 0 else 1.0
+tr_labor_factor = min(1.0, tr_operators / total_tr_units) if total_tr_units > 0 else 1.0
+
+# ---------------------------------------------------------
 # ADD / REMOVE CYCLE TIMES
 # ---------------------------------------------------------
 st.header("Cycle Times (Dig Block + Dump Location)")
@@ -88,41 +123,6 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         if cols[2].button("➖", key=f"remove_tr_{c_idx}_{t_idx}"):
             cycle["trucks"].pop(t_idx)
             st.rerun()
-
-# ---------------------------------------------------------
-# GLOBAL INPUTS (EQUIPMENT AVAILABILITY & STAFFING)
-# ---------------------------------------------------------
-st.header("Global Inputs & Availability")
-
-daily_target = st.number_input("Daily Target (BCM)", value=40000)
-
-st.subheader("Excavator Fleet Metrics")
-col_ex1, col_ex2 = st.columns(2)
-ex_avail = col_ex1.number_input("Excavator Mechanical Availability (%)", value=90.0)
-ex_util = col_ex2.number_input("Excavator Use of Availability (Utilisation %)", value=85.0)
-
-st.subheader("Truck Fleet Metrics")
-col_tr1, col_tr2 = st.columns(2)
-tr_avail = col_tr1.number_input("Truck Mechanical Availability (%)", value=85.0)
-tr_util = col_tr2.number_input("Truck Use of Availability (Utilisation %)", value=80.0)
-
-st.subheader("Labor / Operator Constraints")
-col_op1, col_op2 = st.columns(2)
-
-# Count total configured units across all cycles for labor comparisons
-total_ex_units = sum(len(c["excavators"]) for c in st.session_state.cycles)
-total_tr_units = sum(sum(t["count"] for t in c["trucks"]) for c in st.session_state.cycles)
-
-ex_operators = col_op1.number_input("Available Excavator Operators", value=int(total_ex_units))
-tr_operators = col_op2.number_input("Available Truck Operators", value=int(total_tr_units))
-
-# Effective equipment utilizations incorporating mechanical availability & UA
-ex_effective_util = (ex_avail / 100.0) * (ex_util / 100.0)
-tr_effective_util = (tr_avail / 100.0) * (tr_util / 100.0)
-
-# Operator constraint scaling factor (caps fleet capacity if operators < physical units)
-ex_labor_factor = min(1.0, ex_operators / total_ex_units) if total_ex_units > 0 else 1.0
-tr_labor_factor = min(1.0, tr_operators / total_tr_units) if total_tr_units > 0 else 1.0
 
 # ---------------------------------------------------------
 # CALCULATIONS PER CYCLE
