@@ -228,9 +228,9 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         truck_bottleneck_cycles.append(c_info)
 
         st.error(
-            f"🚨 **Truck Bottleneck in Cycle {c_idx+1}:** "
-            f"Truck capacity falls short of dig capacity by {shortfall_bcm:,.0f} BCM/day. "
-            f"Needs ~**{needed_trucks} additional truck(s)** to match excavator output."
+            f"🚨 **Truck Shortage on Cycle {c_idx+1}:** "
+            f"Trucks are falling behind dig capacity by {shortfall_bcm:,.0f} BCM/day. "
+            f"Needs ~**{needed_trucks} more truck(s)** to keep up with the digger."
         )
 
     # Case B: Surplus truck capacity relative to excavator output
@@ -243,16 +243,15 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         over_capacity_cycles.append(c_info)
 
         st.warning(
-            f"ℹ️ **Truck Over-Capacity in Cycle {c_idx+1}:** "
-            f"Truck haul capacity exceeds dig capacity by {excess_bcm:,.0f} BCM/day "
-            f"(~{excess_trucks:.1f} excess trucks)."
+            f"ℹ️ **Extra Truck Capacity on Cycle {c_idx+1}:** "
+            f"Truck haul capacity is higher than dig capacity by {excess_bcm:,.0f} BCM/day "
+            f"(about {excess_trucks:.1f} trucks queuing or waiting)."
         )
 
 # ---------------------------------------------------------
 # OPTIMIZATION HELPER (FLEET REALLOCATION & SWAPPING)
 # ---------------------------------------------------------
 def evaluate_reallocation_scenarios(cycles, daily_target, tr_effective_util, tr_labor_factor, ex_effective_util, ex_labor_factor):
-    # Unroll all deployed trucks into individual items: (capacity, original_cycle_index)
     all_trucks = []
     for c_idx, c in enumerate(cycles):
         for tr in c["trucks"]:
@@ -263,7 +262,6 @@ def evaluate_reallocation_scenarios(cycles, daily_target, tr_effective_util, tr_
     if not all_trucks or len(cycles) < 2:
         return None
 
-    # Calculate actual system output for a given truck assignment
     def calculate_total_system_output(assignment):
         total_output = 0
         cycle_outputs = []
@@ -277,7 +275,6 @@ def evaluate_reallocation_scenarios(cycles, daily_target, tr_effective_util, tr_
             else:
                 daily_truck = 0
 
-            # Effective output of a cycle is capped by dig capacity
             effective_cycle_output = min(daily_dig, daily_truck)
             total_output += effective_cycle_output
             cycle_outputs.append({
@@ -288,15 +285,11 @@ def evaluate_reallocation_scenarios(cycles, daily_target, tr_effective_util, tr_
             })
         return total_output, cycle_outputs
 
-    # Search all partitions of all_trucks across available cycles
     best_assignment = None
     best_output = 0
     best_gap = float("inf")
-
-    # Generate assignments using combinations
     num_cycles = len(cycles)
     
-    # Iterate over combinations of assignments
     def partition_trucks(truck_index, current_assignment):
         nonlocal best_assignment, best_output, best_gap
         if truck_index == len(all_trucks):
@@ -338,26 +331,26 @@ st.write(f"**Total Daily Truck Capacity:** {total_daily_truck:,.0f} BCM/day")
 
 # Operator warnings
 if ex_labor_factor < 1.0:
-    st.warning(f"⚠️ Dig capacity is restricted by labor: {ex_operators} operators for {total_ex_units} excavators.")
+    st.warning(f"⚠️ Digger output is limited by operator shortage: {ex_operators} operators for {total_ex_units} excavators.")
 if tr_labor_factor < 1.0:
-    st.warning(f"⚠️ Truck capacity is restricted by labor: {tr_operators} operators for {total_tr_units} trucks.")
+    st.warning(f"⚠️ Truck output is limited by operator shortage: {tr_operators} operators for {total_tr_units} trucks.")
 
 # Overall capacity verdict and scenarios
 if daily_target == 0:
-    st.info("💡 Set a Daily Target (BCM) greater than 0 to evaluate overall fleet capacity.")
+    st.info("💡 Set a Daily Target (BCM) above 0 to see target checks.")
 
 elif total_daily_truck < daily_target or any(item["daily_truck"] < item["daily_dig"] for item in cycle_summary):
     if total_daily_truck < daily_target:
-        st.error("❌ Fleet cannot meet daily target. Truck haul capacity is restricting output.")
+        st.error("❌ Target cannot be met. Truck haulage is holding production back.")
     else:
-        st.warning("⚠️ Overall truck capacity meets target, but individual cycle imbalances exist.")
+        st.warning("⚠️ Total truck capacity meets target, but trucks are mismatched between diggers.")
 
     st.markdown("---")
-    st.subheader("💡 Smart Fleet Reassignment & Optimization Scenarios")
+    st.subheader("💡 Shift Action Options to Fix the Bottleneck")
     
-    # MULTI-CYCLE SWAP AND REALLOCATION ENGINE
+    # SCENARIO A: MOVE TRUCKS AROUND
     if len(st.session_state.cycles) > 1:
-        st.markdown("#### Scenario A: Swap & Reallocate Deployed Resources (No New Equipment)")
+        st.markdown("#### Option 1: Move Existing Trucks Between Diggers (No extra equipment needed)")
         
         opt_result = evaluate_reallocation_scenarios(
             st.session_state.cycles,
@@ -376,40 +369,39 @@ elif total_daily_truck < daily_target or any(item["daily_truck"] < item["daily_d
             if improvement > 0:
                 if new_gap == 0:
                     st.success(
-                        f"🎯 **Target Achieved!** By swapping/reallocating existing trucks across cycles, "
-                        f"system output increases by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**."
+                        f"🎯 **Target Met!** By swapping trucks between runs, "
+                        f"daily output increases by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**."
                     )
                 else:
                     st.info(
-                        f"📈 **Target Gap Reduced!** By reallocating existing trucks, "
-                        f"system output increases by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day** "
-                        f"(Remaining target deficit: **{new_gap:,.0f} BCM/day**)."
+                        f"📈 **Higher Production!** Moving trucks around adds **+{improvement:,.0f} BCM/day**, "
+                        f"bringing daily output to **{new_output:,.0f} BCM/day** "
+                        f"(Short of target by **{new_gap:,.0f} BCM/day**)."
                     )
 
-                st.write("**Recommended Optimal Truck Deployment:**")
+                st.write("**Recommended Shift Truck Layout:**")
                 for c_idx, det in enumerate(opt_result["cycle_details"]):
                     assigned_caps = det["trucks"]
-                    # Format truck count list for display
                     cap_counts = {}
                     for cap in assigned_caps:
                         cap_counts[cap] = cap_counts.get(cap, 0) + 1
                     
-                    tr_str = ", ".join([f"{count}x {cap} BCM trucks" for cap, count in cap_counts.items()]) if cap_counts else "No trucks assigned"
+                    tr_str = ", ".join([f"{count}x {cap:g} BCM truck(s)" for cap, count in cap_counts.items()]) if cap_counts else "No trucks"
                     st.write(
-                        f"- **Cycle {c_idx+1}:** Assign **{tr_str}** "
-                        f"(Achieves **{det['effective']:,.0f} BCM/day** vs Dig Cap of {det['daily_dig']:,.0f} BCM/day)."
+                        f"- **Cycle {c_idx+1}:** Send **{tr_str}** "
+                        f"(Delivers **{det['effective']:,.0f} BCM/day** out of {det['daily_dig']:,.0f} BCM dig rate)."
                     )
             else:
                 st.write(
-                    "- *Current deployment is already optimal for existing resources across active cycle routes. "
-                    "Swapping existing trucks will not increase overall output.*"
+                    "Trucks are already placed where they work best. "
+                    "Swapping trucks between runs won't increase production."
                 )
     else:
-        st.write("*(Add 2 or more Cycle Times to enable automatic cross-cycle truck swapping and reassignment scenarios)*")
+        st.write("*(Add a 2nd cycle block to check truck swapping options)*")
 
-    # SCENARIO B: CYCLE TIME REDUCTION REQUIREMENTS
-    st.markdown("#### Scenario B: Required Cycle Time Improvements")
-    st.caption("*(Assuming equipment allocation and dig rates stay fixed)*")
+    # SCENARIO B: SPEED UP CYCLE TIMES
+    st.markdown("#### Option 2: Shave Time Off Haul Cycles")
+    st.caption("*(Keep current truck numbers and digger speeds, but reduce trip times)*")
     for item in cycle_summary:
         if item["daily_truck"] > 0 and item["cycle_time"] > 0 and item["daily_truck"] < item["daily_dig"]:
             target_daily_truck_needed = item["daily_dig"]
@@ -417,53 +409,53 @@ elif total_daily_truck < daily_target or any(item["daily_truck"] < item["daily_d
             time_reduction = item["cycle_time"] - target_cycle_time
             
             st.write(
-                f"- **Cycle {item['cycle_num']}:** Reduce round-trip time from **{item['cycle_time']:.1f} mins** "
-                f"down to **{target_cycle_time:.1f} mins** (shave off **{time_reduction:.1f} mins**) "
-                f"to match excavator dig capacity."
+                f"- **Cycle {item['cycle_num']}:** Cut round-trip time from **{item['cycle_time']:.1f} mins** "
+                f"down to **{target_cycle_time:.1f} mins** (shave off **{time_reduction:.1f} mins** per lap) "
+                f"so trucks keep pace with the digger."
             )
 
-    # SCENARIO C: ADDITIONAL EQUIPMENT REQUIRED
-    st.markdown("#### Scenario C: Direct Fleet Additions")
+    # SCENARIO C: ADD TRUCKS
+    st.markdown("#### Option 3: Bring in Additional Trucks")
     for item in truck_bottleneck_cycles:
         if item["daily_bcm_per_truck"] > 0:
             add_trucks = math.ceil(item["shortfall_bcm"] / item["daily_bcm_per_truck"])
             st.write(
-                f"- **Cycle {item['cycle_num']}:** Add **{add_trucks} additional truck(s)** matching current specs "
-                f"to clear the **{item['shortfall_bcm']:,.0f} BCM/day** bottleneck."
+                f"- **Cycle {item['cycle_num']}:** Send **{add_trucks} extra truck(s)** "
+                f"to recover the **{item['shortfall_bcm']:,.0f} BCM/day** loss."
             )
 
 elif total_daily_dig < daily_target:
-    st.error("❌ Fleet cannot meet daily target. Dig rate (excavators) is the primary bottleneck.")
+    st.error("❌ Target cannot be met. Digger capacity is holding production back.")
     
     st.markdown("---")
-    st.subheader("💡 Recommended Operational Scenarios")
+    st.subheader("💡 Shift Action Options to Fix the Bottleneck")
     
     overall_dig_deficit = daily_target - total_daily_dig
-    st.write(f"**Total Dig Deficit to Target:** {overall_dig_deficit:,.0f} BCM/day")
+    st.write(f"**Digging Deficit:** {overall_dig_deficit:,.0f} BCM/day short of target")
 
     if ex_effective_util > 0 and ex_labor_factor > 0:
         required_additional_dig_rate = overall_dig_deficit / (24 * ex_effective_util * ex_labor_factor)
-        st.markdown("#### Scenario A: Increase Dig Capacity")
+        st.markdown("#### Option 1: Increase Dig Rate")
         st.write(
-            f"- Add excavators or upgrade excavator units to achieve an extra "
-            f"**{required_additional_dig_rate:,.0f} BCM/hr** dig output across active dig blocks."
+            f"- Add diggers or speed up digging by **{required_additional_dig_rate:,.0f} BCM/hr** "
+            f"to hit target."
         )
     
     if ex_labor_factor < 1.0:
-        st.markdown("#### Scenario B: Resolve Excavator Operator Shortage")
+        st.markdown("#### Option 2: Add Digger Operators")
         st.write(
-            f"- Assign **{total_ex_units - ex_operators} additional excavator operator(s)** "
-            f"to remove labor restrictions and unlock full dig capacity."
+            f"- Put **{total_ex_units - ex_operators} more operator(s)** on park-up excavators "
+            f"to reach full dig capacity."
         )
 
 else:
     st.success("✅ Fleet can meet daily target.")
     if over_capacity_cycles:
-        st.info("🚜 **Over-Capacity Analysis:** Target is achieved, but you have excess truck capacity in:")
+        st.info("🚜 **Over-Capacity Check:** Target is met, but you have extra trucks on:")
         for item in over_capacity_cycles:
             st.write(
-                f"- **Cycle {item['cycle_num']}:** Surplus of **{item['excess_bcm']:,.0f} BCM/day** "
-                f"(approx. **{item['excess_trucks']:.1f}** idle/redundant trucks relative to dig output)."
+                f"- **Cycle {item['cycle_num']}:** Has **{item['excess_bcm']:,.0f} BCM/day** extra haul capacity "
+                f"(about **{item['excess_trucks']:.1f}** idle/queuing trucks)."
             )
     else:
-        st.info("👌 **Balanced Fleet:** Truck capacity closely matches dig capacity across all cycles.")
+        st.info("👌 **Fleet Balanced:** Truck numbers match digger output across all cycles.")
