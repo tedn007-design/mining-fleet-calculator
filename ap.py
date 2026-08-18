@@ -8,7 +8,7 @@ st.title("⛏️ Mining Fleet Capacity Calculator")
 st.write("Quick diagnostic tool for engineers, supervisors, and shift foremen.")
 
 # ---------------------------------------------------------
-# INITIALISE SESSION STATE (Defaulted to 0)
+# INITIALISE SESSION STATE (All initial values set to 0)
 # ---------------------------------------------------------
 if "cycles" not in st.session_state:
     st.session_state.cycles = [
