@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import math
-import itertools
 
 st.set_page_config(page_title="Mine Fleet Calculator", page_icon="L2.png")
 
@@ -369,28 +368,51 @@ elif total_daily_truck < daily_target or any(item["daily_truck"] < item["daily_d
             if improvement > 0:
                 if new_gap == 0:
                     st.success(
-                        f"🎯 **Target Met!** By swapping trucks between runs, "
-                        f"daily output increases by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**."
+                        f"🎯 **Best Scenario Found!** By moving trucks around between diggers, "
+                        f"daily output increases by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day** (Hits target!)."
                     )
                 else:
                     st.info(
-                        f"📈 **Higher Production!** Moving trucks around adds **+{improvement:,.0f} BCM/day**, "
-                        f"bringing daily output to **{new_output:,.0f} BCM/day** "
+                        f"📈 **Best Scenario Found!** Moving trucks around adds **+{improvement:,.0f} BCM/day**, "
+                        f"bringing total daily output to **{new_output:,.0f} BCM/day** "
                         f"(Short of target by **{new_gap:,.0f} BCM/day**)."
                     )
 
-                st.write("**Recommended Shift Truck Layout:**")
+                st.write("**📋 Recommended Shift Directives (What to move):**")
+                
+                # Calculate net movement of trucks per cycle relative to user's initial input
                 for c_idx, det in enumerate(opt_result["cycle_details"]):
-                    assigned_caps = det["trucks"]
-                    cap_counts = {}
-                    for cap in assigned_caps:
-                        cap_counts[cap] = cap_counts.get(cap, 0) + 1
+                    orig_count = sum(tr["count"] for tr in st.session_state.cycles[c_idx]["trucks"])
+                    new_count = len(det["trucks"])
+                    diff = new_count - orig_count
                     
-                    tr_str = ", ".join([f"{count}x {cap:g} BCM truck(s)" for cap, count in cap_counts.items()]) if cap_counts else "No trucks"
-                    st.write(
-                        f"- **Cycle {c_idx+1}:** Send **{tr_str}** "
-                        f"(Delivers **{det['effective']:,.0f} BCM/day** out of {det['daily_dig']:,.0f} BCM dig rate)."
-                    )
+                    # Format recommended truck specs
+                    cap_counts = {}
+                    for cap in det["trucks"]:
+                        cap_counts[cap] = cap_counts.get(cap, 0) + 1
+                    tr_str = ", ".join([f"{count}x {cap:g} BCM truck(s)" for cap, count in cap_counts.items()]) if cap_counts else "no trucks"
+
+                    if diff < 0:
+                        st.write(
+                            f"- 🔄 **Took {abs(diff)} truck(s) away from Cycle {c_idx+1} digger** "
+                            f"(leaves {new_count} truck(s) total: {tr_str})."
+                        )
+                    elif diff > 0:
+                        st.write(
+                            f"- 🔄 **Added {diff} truck(s) to Cycle {c_idx+1} digger** "
+                            f"(gives {new_count} truck(s) total: {tr_str})."
+                        )
+                    else:
+                        st.write(
+                            f"- ⏸️ **Kept Cycle {c_idx+1} at {new_count} truck(s)** ({tr_str})."
+                        )
+
+                st.write("**Why this gives the best result:**")
+                st.caption(
+                    "The system moved trucks away from longer/slower haul runs and placed them on faster, "
+                    "shorter runs where trucks complete more laps per shift and haul more total tonnage."
+                )
+
             else:
                 st.write(
                     "Trucks are already placed where they work best. "
