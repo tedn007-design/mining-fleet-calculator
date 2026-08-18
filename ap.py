@@ -59,18 +59,9 @@ ex_labor_factor = min(1.0, ex_operators / total_ex_units) if total_ex_units > 0 
 tr_labor_factor = min(1.0, tr_operators / total_tr_units) if total_tr_units > 0 else 1.0
 
 # ---------------------------------------------------------
-# ADD / REMOVE CYCLE TIMES
+# CYCLE TIMES (DIG BLOCK + DUMP LOCATION)
 # ---------------------------------------------------------
 st.header("Cycle Times (Dig Block + Dump Location)")
-
-if st.button("➕ Add Cycle Time"):
-    st.session_state.cycles.append({
-        "cycle_time": 0.0,
-        "excavators": [{"rate": 0.0}],
-        "trucks": [{"capacity": 0.0, "count": 0}]
-    })
-    st.session_state.scroll_to_cycle = len(st.session_state.cycles) - 1
-    st.rerun()
 
 # Display each cycle time block
 for c_idx, cycle in enumerate(st.session_state.cycles):
@@ -140,6 +131,18 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         )
         if cols[2].button("➖", key=f"remove_tr_{c_idx}_{t_idx}"):
             cycle["trucks"].pop(t_idx)
+            st.rerun()
+
+    # ➕ Add Cycle Time button placed at the bottom of the last cycle block
+    if c_idx == len(st.session_state.cycles) - 1:
+        st.write("---")
+        if st.button("➕ Add Cycle Time", key="add_cycle_bottom"):
+            st.session_state.cycles.append({
+                "cycle_time": 0.0,
+                "excavators": [{"rate": 0.0}],
+                "trucks": [{"capacity": 0.0, "count": 0}]
+            })
+            st.session_state.scroll_to_cycle = len(st.session_state.cycles) - 1
             st.rerun()
 
 # Auto-scroll trigger script for newly created cycle
