@@ -167,6 +167,7 @@ total_daily_dig = 0
 total_daily_truck = 0
 over_capacity_cycles = []
 truck_bottleneck_cycles = []
+cycle_summary = []
 
 for c_idx, cycle in enumerate(st.session_state.cycles):
 
@@ -204,16 +205,26 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         avg_cap = (sum(tr["capacity"] for tr in cycle["trucks"]) / len(cycle["trucks"])) if cycle["trucks"] else 0
         daily_bcm_per_truck = ((60 / (cycle_time if cycle_time > 0 else 1)) * avg_cap * tr_effective_util * tr_labor_factor) * 24
 
+    c_info = {
+        "cycle_num": c_idx + 1,
+        "cycle_time": cycle_time,
+        "daily_dig": daily_dig,
+        "daily_truck": daily_truck,
+        "total_trucks": total_cycle_trucks,
+        "daily_bcm_per_truck": daily_bcm_per_truck,
+        "truck_details": cycle["trucks"]
+    }
+    cycle_summary.append(c_info)
+
     # Case A: Truck fleet cannot keep up with excavator dig rate
     if daily_truck < daily_dig and daily_dig > 0:
         shortfall_bcm = daily_dig - daily_truck
         needed_trucks = math.ceil(shortfall_bcm / daily_bcm_per_truck) if daily_bcm_per_truck > 0 else 0
 
-        truck_bottleneck_cycles.append({
-            "cycle_num": c_idx + 1,
-            "shortfall_bcm": shortfall_bcm,
-            "needed_trucks": needed_trucks
-        })
+        c_info["shortfall_bcm"] = shortfall_bcm
+        c_info["needed_trucks"] = needed_trucks
+        truck_bottleneck_cycles.append(c_info)
+
         st.error(
             f"🚨 **Truck Bottleneck in Cycle {c_idx+1}:** "
             f"Truck capacity falls short of dig capacity by {shortfall_bcm:,.0f} BCM/day. "
@@ -225,11 +236,10 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         excess_bcm = daily_truck - daily_dig
         excess_trucks = excess_bcm / daily_bcm_per_truck if daily_bcm_per_truck > 0 else 0
 
-        over_capacity_cycles.append({
-            "cycle_num": c_idx + 1,
-            "excess_bcm": excess_bcm,
-            "excess_trucks": excess_trucks
-        })
+        c_info["excess_bcm"] = excess_bcm
+        c_info["excess_trucks"] = excess_trucks
+        over_capacity_cycles.append(c_info)
+
         st.warning(
             f"ℹ️ **Truck Over-Capacity in Cycle {c_idx+1}:** "
             f"Truck haul capacity exceeds dig capacity by {excess_bcm:,.0f} BCM/day "
@@ -237,7 +247,7 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         )
 
 # ---------------------------------------------------------
-# OVERALL VERDICT
+# OVERALL VERDICT & MULTI-CYCLE SCENARIOS
 # ---------------------------------------------------------
 st.header("Overall Fleet Verdict")
 
@@ -250,20 +260,92 @@ if ex_labor_factor < 1.0:
 if tr_labor_factor < 1.0:
     st.warning(f"⚠️ Truck capacity is restricted by labor: {tr_operators} operators for {total_tr_units} trucks.")
 
-# Overall capacity verdict
+# Overall capacity verdict and scenarios
 if daily_target == 0:
     st.info("💡 Set a Daily Target (BCM) greater than 0 to evaluate overall fleet capacity.")
+
 elif total_daily_truck < daily_target:
     st.error("❌ Fleet cannot meet daily target. Truck capacity is the bottleneck.")
-    if truck_bottleneck_cycles:
-        st.markdown("### 🚜 Resource Allocation Required:")
-        for item in truck_bottleneck_cycles:
+    
+    st.markdown("---")
+    st.subheader("💡 Recommended Operational Scenarios")
+    
+    overall_truck_deficit = daily_target - total_daily_truck
+    st.write(f"**Total Truck Deficit to Target:** {overall_truck_deficit:,.0f} BCM/day")
+
+    # SCENARIO 1: FLEET REASSIGNMENT / REDISTRIBUTION ACROSS CYCLES
+    if len(cycle_summary) > 1:
+        st.markdown("#### Scenario A: Cross-Cycle Fleet Redistribution (Reassign Existing Trucks)")
+        has_reassignment = False
+        
+        for c_surplus in over_capacity_cycles:
+            avail_trucks = math.floor(c_surplus.get("excess_trucks", 0))
+            if avail_trucks > 0:
+                for c_deficit in truck_bottleneck_cycles:
+                    needed = c_deficit.get("needed_trucks", 0)
+                    if needed > 0 and avail_trucks > 0:
+                        shift_count = min(avail_trucks, needed)
+                        st.write(
+                            f"- 🔄 **Shift {shift_count} truck(s)** from **Cycle {c_surplus['cycle_num']}** "
+                            f"(Surplus) to **Cycle {c_deficit['cycle_num']}** (Deficit) to balance haul capacities."
+                        )
+                        avail_trucks -= shift_count
+                        has_reassignment = True
+
+        if not has_reassignment:
             st.write(
-                f"- **Cycle {item['cycle_num']}:** Deficit of **{item['shortfall_bcm']:,.0f} BCM/day**. "
-                f"Add at least **{item['needed_trucks']} truck(s)** to clear this cycle's bottleneck."
+                "- *No surplus trucks available in other cycles to shift. All cycles are currently fully utilized or deficient.*"
             )
+
+    # SCENARIO 2: OPTIMISE CYCLE TIMES
+    st.markdown("#### Scenario B: Operational Cycle Time Reduction")
+    st.caption("*(Assuming dig rates and truck counts remain fixed)*")
+    for item in cycle_summary:
+        if item["daily_truck"] > 0 and item["cycle_time"] > 0:
+            # Proportionally adjust cycle time to increase output to meet target share
+            required_cycle_truck = item["daily_truck"] + (overall_truck_deficit * (item["daily_dig"] / total_daily_dig if total_daily_dig > 0 else 1 / len(cycle_summary)))
+            target_cycle_time = item["cycle_time"] * (item["daily_truck"] / required_cycle_truck)
+            time_reduction = item["cycle_time"] - target_cycle_time
+            
+            if time_reduction > 0:
+                st.write(
+                    f"- **Cycle {item['cycle_num']}:** Reduce cycle time from **{item['cycle_time']:.1f} mins** "
+                    f"to **{target_cycle_time:.1f} mins** (shave off **{time_reduction:.1f} mins** per round trip)."
+                )
+
+    # SCENARIO 3: ADD FLEET UNITS
+    st.markdown("#### Scenario C: Direct Fleet Expansion")
+    for item in truck_bottleneck_cycles:
+        if item["daily_bcm_per_truck"] > 0:
+            add_trucks = math.ceil(item["shortfall_bcm"] / item["daily_bcm_per_truck"])
+            st.write(
+                f"- **Cycle {item['cycle_num']}:** Add **{add_trucks} additional truck(s)** matching current specs."
+            )
+
 elif total_daily_dig < daily_target:
     st.error("❌ Fleet cannot meet daily target. Dig rate (excavators) is the bottleneck.")
+    
+    st.markdown("---")
+    st.subheader("💡 Recommended Operational Scenarios")
+    
+    overall_dig_deficit = daily_target - total_daily_dig
+    st.write(f"**Total Dig Deficit to Target:** {overall_dig_deficit:,.0f} BCM/day")
+
+    if ex_effective_util > 0 and ex_labor_factor > 0:
+        required_additional_dig_rate = overall_dig_deficit / (24 * ex_effective_util * ex_labor_factor)
+        st.markdown("#### Scenario A: Reallocate or Add Dig Capacity")
+        st.write(
+            f"- Add excavators or assign higher-capacity loading units with an extra combined output of "
+            f"**{required_additional_dig_rate:,.0f} BCM/hr** across active dig blocks."
+        )
+    
+    if ex_labor_factor < 1.0:
+        st.markdown("#### Scenario B: Resolve Excavator Operator Shortage")
+        st.write(
+            f"- Assign **{total_ex_units - ex_operators} additional excavator operator(s)** "
+            f"to remove labor restrictions and unlock existing fleet output."
+        )
+
 else:
     st.success("✅ Fleet can meet daily target.")
     if over_capacity_cycles:
