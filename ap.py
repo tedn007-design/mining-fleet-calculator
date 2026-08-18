@@ -1,4 +1,5 @@
 import streamlit as st
+import math
 
 st.set_page_config(page_title="Mine Fleet Calculator", page_icon="L2.png")
 
@@ -131,6 +132,7 @@ st.header("Cycle Production Results")
 
 total_daily_dig = 0
 total_daily_truck = 0
+over_capacity_cycles = []
 
 for c_idx, cycle in enumerate(st.session_state.cycles):
 
@@ -160,6 +162,29 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
     st.write(f"**Daily Dig Capacity:** {daily_dig:,.0f} BCM/day")
     st.write(f"**Daily Truck Capacity:** {daily_truck:,.0f} BCM/day")
 
+    # Check for truck over-capacity vs dig capacity in this cycle block
+    if daily_truck > daily_dig and daily_dig > 0:
+        excess_bcm = daily_truck - daily_dig
+        
+        # Calculate surplus truck count equivalent based on average truck unit capacity
+        total_cycle_trucks = sum(tr["count"] for tr in cycle["trucks"])
+        if total_cycle_trucks > 0:
+            bcm_per_truck = daily_truck / total_cycle_trucks
+            excess_trucks = excess_bcm / bcm_per_truck
+        else:
+            excess_trucks = 0
+
+        over_capacity_cycles.append({
+            "cycle_num": c_idx + 1,
+            "excess_bcm": excess_bcm,
+            "excess_trucks": excess_trucks
+        })
+        st.warning(
+            f"ℹ️ **Truck Over-Capacity in Cycle {c_idx+1}:** "
+            f"Truck haul capacity exceeds dig capacity by {excess_bcm:,.0f} BCM/day "
+            f"(~{excess_trucks:.1f} excess trucks)."
+        )
+
 # ---------------------------------------------------------
 # OVERALL VERDICT
 # ---------------------------------------------------------
@@ -181,3 +206,14 @@ elif total_daily_dig < daily_target:
     st.error("❌ Fleet cannot meet daily target. Dig rate is the bottleneck.")
 else:
     st.success("✅ Fleet can meet daily target.")
+    
+    # Identify over-capacitated cycles when target is achieved
+    if over_capacity_cycles:
+        st.info("🚜 **Over-Capacity Analysis:** The daily target is achieved, but you have excess truck capacity in:")
+        for item in over_capacity_cycles:
+            st.write(
+                f"- **Cycle {item['cycle_num']}:** Over-capacitated by **{item['excess_bcm']:,.0f} BCM/day** "
+                f"(approx. **{item['excess_trucks']:.1f}** idle/redundant trucks relative to excavator output)."
+            )
+    else:
+        st.info("👌 **Balanced Fleet:** Truck capacity closely matches dig capacity across all cycles.")
