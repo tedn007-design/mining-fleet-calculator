@@ -82,7 +82,7 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         )
         tr["count"] = cols[1].number_input(
             f"Truck Type {t_idx+1} Count — Cycle {c_idx+1}",
-            value=tr["count"],
+            value=int(tr["count"]),
             key=f"tr_count_{c_idx}_{t_idx}"
         )
         if cols[2].button("➖", key=f"remove_tr_{c_idx}_{t_idx}"):
@@ -90,15 +90,39 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
             st.rerun()
 
 # ---------------------------------------------------------
-# GLOBAL INPUTS
+# GLOBAL INPUTS (EQUIPMENT AVAILABILITY & STAFFING)
 # ---------------------------------------------------------
-st.header("Global Inputs")
+st.header("Global Inputs & Availability")
 
 daily_target = st.number_input("Daily Target (BCM)", value=40000)
-availability = st.number_input("Mechanical Availability (%)", value=90)
-utilisation = st.number_input("Use of Availability (Utilisation %)", value=85)
 
-effective_utilisation = (availability / 100) * (utilisation / 100)
+st.subheader("Excavator Fleet Metrics")
+col_ex1, col_ex2 = st.columns(2)
+ex_avail = col_ex1.number_input("Excavator Mechanical Availability (%)", value=90.0)
+ex_util = col_ex2.number_input("Excavator Use of Availability (Utilisation %)", value=85.0)
+
+st.subheader("Truck Fleet Metrics")
+col_tr1, col_tr2 = st.columns(2)
+tr_avail = col_tr1.number_input("Truck Mechanical Availability (%)", value=85.0)
+tr_util = col_tr2.number_input("Truck Use of Availability (Utilisation %)", value=80.0)
+
+st.subheader("Labor / Operator Constraints")
+col_op1, col_op2 = st.columns(2)
+
+# Count total configured units across all cycles for labor comparisons
+total_ex_units = sum(len(c["excavators"]) for c in st.session_state.cycles)
+total_tr_units = sum(sum(t["count"] for t in c["trucks"]) for c in st.session_state.cycles)
+
+ex_operators = col_op1.number_input("Available Excavator Operators", value=int(total_ex_units))
+tr_operators = col_op2.number_input("Available Truck Operators", value=int(total_tr_units))
+
+# Effective equipment utilizations incorporating mechanical availability & UA
+ex_effective_util = (ex_avail / 100.0) * (ex_util / 100.0)
+tr_effective_util = (tr_avail / 100.0) * (tr_util / 100.0)
+
+# Operator constraint scaling factor (caps fleet capacity if operators < physical units)
+ex_labor_factor = min(1.0, ex_operators / total_ex_units) if total_ex_units > 0 else 1.0
+tr_labor_factor = min(1.0, tr_operators / total_tr_units) if total_tr_units > 0 else 1.0
 
 # ---------------------------------------------------------
 # CALCULATIONS PER CYCLE
@@ -114,13 +138,19 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
 
     cycle_time = cycle["cycle_time"]
 
+    # Excavator production (adjusted by ex_avail, ex_util, and ex_labor_factor)
     dig_rate = sum(ex["rate"] for ex in cycle["excavators"])
-    daily_dig = dig_rate * 24 * effective_utilisation
+    daily_dig = dig_rate * 24 * ex_effective_util * ex_labor_factor
 
-    truck_hourly = sum(
-        (60 / cycle_time) * tr["capacity"] * tr["count"] * effective_utilisation
-        for tr in cycle["trucks"]
-    )
+    # Truck production (adjusted by tr_avail, tr_util, and tr_labor_factor)
+    if cycle_time > 0:
+        truck_hourly = sum(
+            (60 / cycle_time) * tr["capacity"] * tr["count"] * tr_effective_util * tr_labor_factor
+            for tr in cycle["trucks"]
+        )
+    else:
+        truck_hourly = 0
+        
     daily_truck = truck_hourly * 24
 
     total_daily_dig += daily_dig
@@ -138,6 +168,13 @@ st.header("Overall Fleet Verdict")
 st.write(f"**Total Daily Dig Capacity:** {total_daily_dig:,.0f} BCM/day")
 st.write(f"**Total Daily Truck Capacity:** {total_daily_truck:,.0f} BCM/day")
 
+# Operator warnings
+if ex_labor_factor < 1.0:
+    st.warning(f"⚠️ Dig capacity is restricted by labor: {ex_operators} operators for {total_ex_units} excavators.")
+if tr_labor_factor < 1.0:
+    st.warning(f"⚠️ Truck capacity is restricted by labor: {tr_operators} operators for {total_tr_units} trucks.")
+
+# Overall capacity verdict
 if total_daily_truck < daily_target:
     st.error("❌ Fleet cannot meet daily target. Truck capacity is the bottleneck.")
 elif total_daily_dig < daily_target:
