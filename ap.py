@@ -1,9 +1,9 @@
 import streamlit as st
 import math
 
-st.set_page_config(page_title="Mine Fleet Calculator", page_icon="⛏️")
+st.set_page_config(page_title="Mine Fleet Calculator", page_icon=None)
 
-st.title("⛏️ Mining Fleet Capacity Calculator")
+st.title("Mining Fleet Capacity Calculator")
 st.write("Quick diagnostic tool for engineers, supervisors, and shift foremen.")
 
 # ---------------------------------------------------------
@@ -65,12 +65,12 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         key=f"cycle_time_{c_idx}"
     )
 
-    if st.button(f"➖ Remove Cycle Time {c_idx+1}", key=f"remove_cycle_{c_idx}"):
+    if st.button(f"Remove Cycle Time {c_idx+1}", key=f"remove_cycle_{c_idx}"):
         st.session_state.cycles.pop(c_idx)
         st.rerun()
 
     st.write("### Excavators")
-    if st.button("➕ Add Excavator", key=f"add_ex_{c_idx}"):
+    if st.button("Add Excavator", key=f"add_ex_{c_idx}"):
         cycle["excavators"].append({"rate": 0.0})
         st.rerun()
 
@@ -82,12 +82,12 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
             min_value=0.0,
             key=f"ex_{c_idx}_{e_idx}"
         )
-        if cols[1].button("➖", key=f"remove_ex_{c_idx}_{e_idx}"):
+        if cols[1].button("Remove", key=f"remove_ex_{c_idx}_{e_idx}"):
             cycle["excavators"].pop(e_idx)
             st.rerun()
 
     st.write("### Trucks")
-    if st.button("➕ Add Truck Type", key=f"add_tr_{c_idx}"):
+    if st.button("Add Truck Type", key=f"add_tr_{c_idx}"):
         cycle["trucks"].append({"capacity": 0.0, "count": 0})
         st.rerun()
 
@@ -105,13 +105,13 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
             min_value=0,
             key=f"tr_count_{c_idx}_{t_idx}"
         )
-        if cols[2].button("➖", key=f"remove_tr_{c_idx}_{t_idx}"):
+        if cols[2].button("Remove", key=f"remove_tr_{c_idx}_{t_idx}"):
             cycle["trucks"].pop(t_idx)
             st.rerun()
 
     if c_idx == len(st.session_state.cycles) - 1:
         st.write("---")
-        if st.button("➕ Add Cycle Time", key="add_cycle_bottom"):
+        if st.button("Add Cycle Time", key="add_cycle_bottom"):
             st.session_state.cycles.append({
                 "cycle_time": 0.0,
                 "excavators": [{"rate": 0.0}],
@@ -181,7 +181,7 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         truck_bottleneck_cycles.append(c_info)
 
         st.error(
-            f"🚨 **Truck Shortage on Cycle {c_idx+1}:** "
+            f"**Truck Shortage on Cycle {c_idx+1}:** "
             f"Trucks fall short of dig capacity by {shortfall_bcm:,.0f} BCM/day. "
             f"Needs ~**{needed_trucks} more truck(s)**."
         )
@@ -194,7 +194,7 @@ for c_idx, cycle in enumerate(st.session_state.cycles):
         over_capacity_cycles.append(c_info)
 
         st.warning(
-            f"ℹ️ **Extra Truck Capacity on Cycle {c_idx+1}:** "
+            f"**Extra Truck Capacity on Cycle {c_idx+1}:** "
             f"Truck capacity exceeds dig output by {excess_bcm:,.0f} BCM/day "
             f"(~{excess_trucks} redundant truck(s) queuing/waiting)."
         )
@@ -273,19 +273,19 @@ st.write(f"**Total Daily Truck Capacity:** {total_daily_truck:,.0f} BCM/day")
 st.write(f"**Actual Deliverable Fleet Output:** {effective_fleet_capacity:,.0f} BCM/day")
 
 if ex_labor_factor < 1.0:
-    st.warning(f"⚠️ Digger output limited by operator shortage: {ex_operators} operators for {total_ex_units} excavators.")
+    st.warning(f"Digger output limited by operator shortage: {ex_operators} operators for {total_ex_units} excavators.")
 if tr_labor_factor < 1.0:
-    st.warning(f"⚠️ Truck output limited by operator shortage: {tr_operators} operators for {total_tr_units} trucks.")
+    st.warning(f"Truck output limited by operator shortage: {tr_operators} operators for {total_tr_units} trucks.")
 
 st.markdown("---")
 
 if daily_target == 0:
-    st.info("💡 Set a Daily Target (BCM) above 0 to see target checks.")
+    st.info("Set a Daily Target (BCM) above 0 to see target checks.")
 
 elif effective_fleet_capacity >= daily_target:
-    st.success(f"✅ **Fleet CAN meet daily target!** (Delivers {effective_fleet_capacity:,.0f} BCM/day vs target of {daily_target:,.0f} BCM/day)")
+    st.success(f"**Fleet CAN meet daily target!** (Delivers {effective_fleet_capacity:,.0f} BCM/day vs target of {daily_target:,.0f} BCM/day)")
     
-    st.subheader("🚜 Target Over-Capacity & Ancillary Deployment Opportunities")
+    st.subheader("Target Over-Capacity & Ancillary Deployment Opportunities")
     
     excess_capacity_bcm = effective_fleet_capacity - daily_target
     
@@ -294,7 +294,7 @@ elif effective_fleet_capacity >= daily_target:
 
     if redundant_trucks > 0:
         st.info(
-            f"💡 **Target Exceeded by {excess_capacity_bcm:,.0f} BCM/day:**\n\n"
+            f"**Target Exceeded by {excess_capacity_bcm:,.0f} BCM/day:**\n\n"
             f"- Your fleet is producing more than required by your {daily_target:,.0f} BCM plan.\n"
             f"- You have **~{redundant_trucks} truck(s)** above what is needed to hit target.\n"
             f"- **Recommendation:** Pull **{redundant_trucks} truck(s)** off main production and deploy them to ancillary tasks "
@@ -302,7 +302,7 @@ elif effective_fleet_capacity >= daily_target:
         )
     else:
         st.info(
-            f"💡 Fleet output matches your plan closely. All trucks are required on current circuits to safely hit the {daily_target:,.0f} BCM target."
+            f"Fleet output matches your plan closely. All trucks are required on current circuits to safely hit the {daily_target:,.0f} BCM target."
         )
 
     if over_capacity_cycles:
@@ -311,9 +311,9 @@ elif effective_fleet_capacity >= daily_target:
             st.caption(f"- Cycle {item['cycle_num']}: Digger has {item['excess_bcm']:,.0f} BCM/day extra truck capacity queuing in the pit.")
 
 else:
-    st.error(f"❌ **Fleet CANNOT meet daily target.** Current fleet delivers {effective_fleet_capacity:,.0f} BCM/day vs target of {daily_target:,.0f} BCM/day (Shortfall: {daily_target - effective_fleet_capacity:,.0f} BCM/day).")
+    st.error(f"**Fleet CANNOT meet daily target.** Current fleet delivers {effective_fleet_capacity:,.0f} BCM/day vs target of {daily_target:,.0f} BCM/day (Shortfall: {daily_target - effective_fleet_capacity:,.0f} BCM/day).")
 
-    st.subheader("💡 Shift Action Options to Fix the Bottleneck")
+    st.subheader("Shift Action Options to Fix the Bottleneck")
     
     st.markdown("#### Option 1: Move Existing Trucks Between Diggers")
     if len(st.session_state.cycles) > 1:
@@ -326,8 +326,8 @@ else:
             improvement = new_output - effective_fleet_capacity
 
             if improvement > 50:
-                st.success(f"🎯 Moving trucks increases site output by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**!")
-                st.write("**📋 Recommended Shift Directives:**")
+                st.success(f"Moving trucks increases site output by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**!")
+                st.write("**Recommended Shift Directives:**")
                 for c_idx, det in enumerate(opt_result["cycle_details"]):
                     orig_count = sum(tr["count"] for tr in st.session_state.cycles[c_idx]["trucks"])
                     new_count = len(det["trucks"])
@@ -339,13 +339,13 @@ else:
                     tr_str = ", ".join([f"{count}x {cap:g} BCM truck(s)" for cap, count in cap_counts.items()]) if cap_counts else "no trucks"
 
                     if diff < 0:
-                        st.write(f"- 🔄 **Took {abs(diff)} truck(s) away from Cycle {c_idx+1}** (leaves {new_count} truck(s): {tr_str}).")
+                        st.write(f"- **Took {abs(diff)} truck(s) away from Cycle {c_idx+1}** (leaves {new_count} truck(s): {tr_str}).")
                     elif diff > 0:
-                        st.write(f"- 🔄 **Added {diff} truck(s) to Cycle {c_idx+1}** (gives {new_count} truck(s): {tr_str}).")
+                        st.write(f"- **Added {diff} truck(s) to Cycle {c_idx+1}** (gives {new_count} truck(s): {tr_str}).")
                     else:
-                        st.write(f"- ⏸️ **Kept Cycle {c_idx+1} at {new_count} truck(s)** ({tr_str}).")
+                        st.write(f"- **Kept Cycle {c_idx+1} at {new_count} truck(s)** ({tr_str}).")
             else:
-                st.write("ℹ️ **Trucks are already placed on their best circuits.** Swapping existing trucks around will not produce extra dirt.")
+                st.write("**Trucks are already placed on their best circuits.** Swapping existing trucks around will not produce extra dirt.")
     else:
         st.write("*(Add more cycle blocks to compare truck movements)*")
 
