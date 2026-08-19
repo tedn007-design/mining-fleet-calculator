@@ -7,24 +7,14 @@ st.title("⛏️ Mining Fleet Capacity Calculator")
 st.write("Quick diagnostic tool for engineers, supervisors, and shift foremen.")
 
 # ---------------------------------------------------------
-# INITIALISE SESSION STATE
+# INITIALISE SESSION STATE (All initial values set to 0)
 # ---------------------------------------------------------
 if "cycles" not in st.session_state:
     st.session_state.cycles = [
         {
-            "cycle_time": 40.0,
-            "excavators": [{"rate": 900.0}],
-            "trucks": [{"capacity": 115.0, "count": 5}]
-        },
-        {
-            "cycle_time": 45.0,
-            "excavators": [{"rate": 800.0}],
-            "trucks": [{"capacity": 115.0, "count": 5}]
-        },
-        {
-            "cycle_time": 38.0,
-            "excavators": [{"rate": 700.0}],
-            "trucks": [{"capacity": 95.0, "count": 5}]
+            "cycle_time": 0.0,
+            "excavators": [{"rate": 0.0}],
+            "trucks": [{"capacity": 0.0, "count": 0}]
         }
     ]
 
@@ -33,17 +23,17 @@ if "cycles" not in st.session_state:
 # ---------------------------------------------------------
 st.header("Global Inputs & Availability")
 
-daily_target = st.number_input("Daily Target (BCM)", value=45000, min_value=0, key="daily_target")
+daily_target = st.number_input("Daily Target (BCM)", value=0, min_value=0, key="daily_target")
 
 st.subheader("Excavator Fleet Metrics")
 col_ex1, col_ex2 = st.columns(2)
-ex_avail = col_ex1.number_input("Excavator Mechanical Availability (%)", value=100.0, min_value=0.0, max_value=100.0, key="ex_avail")
-ex_util = col_ex2.number_input("Excavator Use of Availability (Utilisation %)", value=100.0, min_value=0.0, max_value=100.0, key="ex_util")
+ex_avail = col_ex1.number_input("Excavator Mechanical Availability (%)", value=0.0, min_value=0.0, max_value=100.0, key="ex_avail")
+ex_util = col_ex2.number_input("Excavator Use of Availability (Utilisation %)", value=0.0, min_value=0.0, max_value=100.0, key="ex_util")
 
 st.subheader("Truck Fleet Metrics")
 col_tr1, col_tr2 = st.columns(2)
-tr_avail = col_tr1.number_input("Truck Mechanical Availability (%)", value=100.0, min_value=0.0, max_value=100.0, key="tr_avail")
-tr_util = col_tr2.number_input("Truck Use of Availability (Utilisation %)", value=100.0, min_value=0.0, max_value=100.0, key="tr_util")
+tr_avail = col_tr1.number_input("Truck Mechanical Availability (%)", value=0.0, min_value=0.0, max_value=100.0, key="tr_avail")
+tr_util = col_tr2.number_input("Truck Use of Availability (Utilisation %)", value=0.0, min_value=0.0, max_value=100.0, key="tr_util")
 
 st.subheader("Labor / Operator Constraints")
 col_op1, col_op2 = st.columns(2)
@@ -51,8 +41,8 @@ col_op1, col_op2 = st.columns(2)
 total_ex_units = sum(len(c["excavators"]) for c in st.session_state.cycles)
 total_tr_units = sum(sum(t["count"] for t in c["trucks"]) for c in st.session_state.cycles)
 
-ex_operators = col_op1.number_input("Available Excavator Operators", value=total_ex_units, min_value=0, key="ex_operators")
-tr_operators = col_op2.number_input("Available Truck Operators", value=total_tr_units, min_value=0, key="tr_operators")
+ex_operators = col_op1.number_input("Available Excavator Operators", value=0, min_value=0, key="ex_operators")
+tr_operators = col_op2.number_input("Available Truck Operators", value=0, min_value=0, key="tr_operators")
 
 ex_effective_util = (ex_avail / 100.0) * (ex_util / 100.0)
 tr_effective_util = (tr_avail / 100.0) * (tr_util / 100.0)
@@ -299,7 +289,6 @@ elif effective_fleet_capacity >= daily_target:
     
     excess_capacity_bcm = effective_fleet_capacity - daily_target
     
-    # Calculate average daily BCM per truck across total fleet
     avg_truck_bcm_day = (total_daily_truck / total_tr_units) if total_tr_units > 0 else 1
     redundant_trucks = math.floor(excess_capacity_bcm / avg_truck_bcm_day) if avg_truck_bcm_day > 0 else 0
 
@@ -326,7 +315,6 @@ else:
 
     st.subheader("💡 Shift Action Options to Fix the Bottleneck")
     
-    # Option 1
     st.markdown("#### Option 1: Move Existing Trucks Between Diggers")
     if len(st.session_state.cycles) > 1:
         opt_result = evaluate_reallocation_scenarios(
@@ -337,7 +325,7 @@ else:
             new_output = opt_result["best_output"]
             improvement = new_output - effective_fleet_capacity
 
-            if improvement > 50: # Meaningful improvement
+            if improvement > 50:
                 st.success(f"🎯 Moving trucks increases site output by **+{improvement:,.0f} BCM/day** to **{new_output:,.0f} BCM/day**!")
                 st.write("**📋 Recommended Shift Directives:**")
                 for c_idx, det in enumerate(opt_result["cycle_details"]):
@@ -361,7 +349,6 @@ else:
     else:
         st.write("*(Add more cycle blocks to compare truck movements)*")
 
-    # Option 2
     st.markdown("#### Option 2: Shave Time Off Haul Cycles")
     for item in cycle_summary:
         if item["daily_truck"] > 0 and item["cycle_time"] > 0 and item["daily_truck"] < item["daily_dig"]:
@@ -369,7 +356,6 @@ else:
             time_reduction = item["cycle_time"] - target_cycle_time
             st.write(f"- **Cycle {item['cycle_num']}:** Cut round-trip time from **{item['cycle_time']:.1f} mins** to **{target_cycle_time:.1f} mins** (shave off **{time_reduction:.1f} mins** per lap).")
 
-    # Option 3
     st.markdown("#### Option 3: Bring in Additional Trucks from Park-Up")
     for item in truck_bottleneck_cycles:
         if item["daily_bcm_per_truck"] > 0:
